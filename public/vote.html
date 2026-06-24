@@ -46,6 +46,10 @@
     .r-item.top .bar-fill { background: #10b981; }
     .total { text-align: center; font-size: 0.82rem; color: #64748b; margin-top: 14px; }
 
+    .draft-box { text-align: center; padding: 20px 0; }
+    .draft-box .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    .draft-box h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 8px; }
+    .draft-box p { color: #64748b; font-size: 0.9rem; }
     .info-box { text-align: center; color: #64748b; padding: 20px; }
     .loading { text-align: center; color: #94a3b8; padding: 40px; }
   </style>
@@ -85,6 +89,13 @@
       <div class="total" id="r-total"></div>
     </div>
 
+    <!-- Draft -->
+    <div id="s-draft" style="display:none" class="draft-box">
+      <div class="icon">🕐</div>
+      <h2 id="draft-q"></h2>
+      <p>This poll hasn't started yet. Your instructor will open it during class.</p>
+    </div>
+
     <!-- Error -->
     <div id="s-error" style="display:none" class="info-box">
       <p id="err-text">Poll not found.</p>
@@ -104,6 +115,7 @@
       if (!res.ok) { showError(res.status === 404 ? 'Poll not found.' : 'Could not load poll.'); return; }
       const data = await res.json();
       hide('s-loading');
+      if (data.status === 'draft') { hide('s-loading'); show('s-draft'); document.getElementById('draft-q').textContent = data.question; return; }
       if (data.is_closed) { showResults(data); return; }
       if (localStorage.getItem(VOTED_KEY)) { showThanks(); startChecking(); return; }
       showVote(data);

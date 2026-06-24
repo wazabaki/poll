@@ -26,6 +26,9 @@
     .stat.t.urgent .val { color: #ef4444; }
 
     /* Close / closed */
+    .btn-start { width: 100%; padding: 14px; background: #10b981; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    .btn-start:hover { background: #059669; }
+    .btn-start:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-close { width: 100%; padding: 14px; background: #ef4444; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; }
     .btn-close:hover { background: #dc2626; }
     .btn-close:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -79,6 +82,10 @@
       <div class="stats">
         <div class="stat"><div class="val" id="resp-count">0</div><div class="lbl">Responses</div></div>
         <div class="stat t" id="timer-stat"><div class="val" id="timer-val">—</div><div class="lbl">Time remaining</div></div>
+      </div>
+      <div id="start-wrap" style="display:none">
+        <button class="btn-start" id="start-btn">Start Poll Now</button>
+        <p style="font-size:0.82rem;color:#64748b;margin-top:8px;text-align:center">Students will see the voting form as soon as you start.</p>
       </div>
       <div id="close-wrap">
         <button class="btn-close" id="close-btn">Close Poll Now</button>
@@ -174,20 +181,22 @@
       qrDone = true;
     }
 
-    // Timer
-    if (!d.is_closed) {
-      if (!timerTick) { timerTick = setInterval(() => tickTimer(d.closes_at), 1000); tickTimer(d.closes_at); }
-    } else {
+    // Timer + action buttons
+    if (d.status === 'draft') {
+      document.getElementById('timer-val').textContent = 'Not started';
+      hide('close-wrap');
+      show('start-wrap');
+      document.getElementById('start-btn').onclick = startPoll;
+    } else if (d.is_closed) {
       document.getElementById('timer-val').textContent = 'Ended';
       clearInterval(timerTick);
-    }
-
-    // Close / closed state
-    if (d.is_closed) {
       hide('close-wrap');
+      hide('start-wrap');
       show('closed-banner');
       clearInterval(refreshLoop);
     } else {
+      hide('start-wrap');
+      if (!timerTick) { timerTick = setInterval(() => tickTimer(d.closes_at), 1000); tickTimer(d.closes_at); }
       document.getElementById('close-btn').onclick = closePoll;
     }
 
@@ -247,6 +256,19 @@
         <td>${r.os}</td><td>${r.browser}</td><td>${r.screen}</td><td>${r.ip}</td>`;
       tbody.appendChild(tr);
     });
+  }
+
+  async function startPoll() {
+    if (!confirm(`Start the poll now? The timer will begin immediately.`)) return;
+    const btn = document.getElementById('start-btn');
+    btn.disabled = true; btn.textContent = 'Starting…';
+    try {
+      await fetch(`/api/admin/${token}/start`, { method: 'POST' });
+      timerTick = null;
+      await load();
+    } catch {
+      btn.disabled = false; btn.textContent = 'Start Poll Now';
+    }
   }
 
   async function closePoll() {

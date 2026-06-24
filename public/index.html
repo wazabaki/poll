@@ -47,6 +47,13 @@
     .warning-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px 14px; font-size: 0.83rem; color: #92400e; margin-bottom: 14px; }
     .btn-admin { display: block; text-align: center; padding: 12px; background: #f0fdf4; color: #16a34a; border: 1.5px solid #86efac; border-radius: 10px; font-weight: 700; text-decoration: none; margin-top: 8px; }
     .btn-admin:hover { background: #dcfce7; }
+    .start-toggle { display: flex; flex-direction: column; gap: 10px; }
+    .toggle-opt { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; cursor: pointer; font-size: 0.95rem; transition: all 0.12s; }
+    .toggle-opt:has(input:checked) { border-color: #4f46e5; background: #eef2ff; }
+    .toggle-opt input { accent-color: #4f46e5; width: 16px; height: 16px; cursor: pointer; }
+    .draft-note { background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 11px 14px; font-size: 0.83rem; color: #166534; margin-bottom: 14px; }
+    .btn-dashboard { display: block; text-align: center; padding: 11px; background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; border-radius: 10px; font-weight: 600; text-decoration: none; margin-top: 10px; font-size: 0.9rem; }
+    .btn-dashboard:hover { background: #f1f5f9; }
   </style>
 </head>
 <body>
@@ -86,13 +93,27 @@
           <option value="30">30 minutes</option>
         </select>
       </div>
+      <div class="field">
+        <label>When to start?</label>
+        <div class="start-toggle">
+          <label class="toggle-opt">
+            <input type="radio" name="start" value="now" checked> Start immediately
+          </label>
+          <label class="toggle-opt">
+            <input type="radio" name="start" value="draft"> Save as draft — I'll start it in class
+          </label>
+        </div>
+      </div>
       <button type="submit" class="btn-primary" id="submit-btn">Create Poll</button>
       <p class="err" id="err"></p>
     </form>
   </div>
 
   <div class="card" id="success-card">
-    <div class="success-title">✓ Poll Created!</div>
+    <div class="success-title" id="success-title">✓ Poll Created!</div>
+    <div class="draft-note" id="draft-note" style="display:none">
+      This poll is saved as a draft. The QR code below is ready to add to your slides — students will see "Poll hasn't started yet" until you activate it from the Admin Panel.
+    </div>
     <div class="qr-block">
       <div id="qrcode"></div>
       <small>Students scan this to vote</small>
@@ -104,7 +125,7 @@
         <button class="btn-copy" onclick="copyText('student-url', this)">Copy</button>
       </div>
     </div>
-    <div class="warning-box">⚠️ Save your Admin Link below. You need it to view results and close the poll. Do not share it with students.</div>
+    <div class="warning-box">Save your Admin Link below. You need it to start, manage, and close the poll. Do not share it with students.</div>
     <div class="link-group">
       <label>Your Admin Link — keep this private</label>
       <div class="link-row">
@@ -113,6 +134,7 @@
       </div>
     </div>
     <a href="#" id="admin-btn" class="btn-admin">Open Admin Panel →</a>
+    <a href="/dashboard" class="btn-dashboard">View All Polls (Dashboard)</a>
   </div>
 </div>
 
@@ -148,6 +170,7 @@
           question: document.getElementById('question').value,
           options: opts,
           duration_minutes: Number(document.getElementById('dur').value),
+          start_now: document.querySelector('input[name="start"]:checked').value === 'now',
         }),
       });
       const data = await res.json();
@@ -159,13 +182,17 @@
     }
   };
 
-  function showSuccess({ poll_id, admin_token }) {
+  function showSuccess({ poll_id, admin_token, status }) {
     const base = window.location.origin;
     const studentUrl = `${base}/p/${poll_id}`;
     const adminUrl = `${base}/admin/${admin_token}`;
     document.getElementById('student-url').textContent = studentUrl;
     document.getElementById('admin-url').textContent = adminUrl;
     document.getElementById('admin-btn').href = adminUrl;
+    if (status === 'draft') {
+      document.getElementById('success-title').textContent = 'Poll saved as draft!';
+      document.getElementById('draft-note').style.display = 'block';
+    }
     new QRCode(document.getElementById('qrcode'), {
       text: studentUrl, width: 200, height: 200,
       colorDark: '#1e293b', colorLight: '#ffffff',
