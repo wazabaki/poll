@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClassPoll</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4ff; min-height: 100vh; padding: 28px 16px; color: #1e293b; }
+    .container { max-width: 460px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 24px; }
+    header h1 { font-size: 1.5rem; color: #4f46e5; font-weight: 800; }
+    .card { background: white; border-radius: 16px; padding: 28px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+    .timer { text-align: center; font-size: 0.85rem; padding: 8px 16px; border-radius: 8px; margin-bottom: 20px; background: #f1f5f9; color: #475569; }
+    .timer.urgent { background: #fef2f2; color: #ef4444; font-weight: 700; }
+    h2 { font-size: 1.15rem; font-weight: 700; line-height: 1.45; margin-bottom: 22px; }
+    .field { margin-bottom: 20px; }
+    .field label { display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 7px; }
+    input[type=text] { width: 100%; padding: 12px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 1rem; outline: none; }
+    input[type=text]:focus { border-color: #4f46e5; }
+    .options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+    .opt-label { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 2px solid #e2e8f0; border-radius: 10px; cursor: pointer; font-size: 0.95rem; transition: all 0.12s; }
+    .opt-label:hover { border-color: #c7d2fe; background: #f5f3ff; }
+    .opt-label.selected { border-color: #4f46e5; background: #eef2ff; }
+    .opt-label input { accent-color: #4f46e5; width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
+    .btn-submit { width: 100%; padding: 14px; background: #4f46e5; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+    .btn-submit:hover { background: #4338ca; }
+    .btn-submit:disabled { opacity: 0.55; cursor: not-allowed; }
+    .err { color: #ef4444; font-size: 0.85rem; margin-top: 10px; text-align: center; }
+
+    /* Thank-you state */
+    .center { text-align: center; }
+    .big-icon { font-size: 3.5rem; margin-bottom: 14px; }
+    .ok-title { font-size: 1.3rem; font-weight: 700; color: #10b981; margin-bottom: 8px; }
+    .muted { color: #64748b; font-size: 0.95rem; line-height: 1.5; }
+    .pulse { display: inline-block; margin-top: 16px; font-size: 0.8rem; color: #94a3b8; }
+
+    /* Results state */
+    .results-q { font-size: 1.1rem; font-weight: 700; margin-bottom: 4px; }
+    .results-sub { font-size: 0.82rem; color: #64748b; margin-bottom: 20px; }
+    .r-item { margin-bottom: 16px; }
+    .r-row { display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 5px; font-weight: 600; }
+    .r-row .cnt { font-weight: 400; color: #64748b; }
+    .bar-track { background: #e2e8f0; border-radius: 6px; height: 12px; overflow: hidden; }
+    .bar-fill { background: #4f46e5; height: 100%; border-radius: 6px; transition: width 0.6s ease; }
+    .r-item.top .bar-fill { background: #10b981; }
+    .total { text-align: center; font-size: 0.82rem; color: #64748b; margin-top: 14px; }
+
+    .info-box { text-align: center; color: #64748b; padding: 20px; }
+    .loading { text-align: center; color: #94a3b8; padding: 40px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header><h1>ClassPoll</h1></header>
+  <div class="card">
+    <div class="loading" id="s-loading">Loading…</div>
+
+    <!-- Vote form -->
+    <div id="s-vote" style="display:none">
+      <div class="timer" id="timer"></div>
+      <h2 id="q-text"></h2>
+      <div class="field">
+        <label for="name">Your Name</label>
+        <input type="text" id="name" placeholder="Enter your full name" autocomplete="off" autocorrect="off">
+      </div>
+      <div class="options" id="opts"></div>
+      <button class="btn-submit" id="sub-btn">Submit Answer</button>
+      <p class="err" id="err"></p>
+    </div>
+
+    <!-- Thank you -->
+    <div id="s-thanks" style="display:none" class="center">
+      <div class="big-icon">✓</div>
+      <div class="ok-title">Response submitted!</div>
+      <p class="muted">Results will appear here once the poll is closed by your instructor.</p>
+      <span class="pulse" id="pulse">Waiting for poll to close…</span>
+    </div>
+
+    <!-- Results -->
+    <div id="s-results" style="display:none">
+      <div class="results-q" id="r-q"></div>
+      <div class="results-sub">Poll Results</div>
+      <div id="r-list"></div>
+      <div class="total" id="r-total"></div>
+    </div>
+
+    <!-- Error -->
+    <div id="s-error" style="display:none" class="info-box">
+      <p id="err-text">Poll not found.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const pollId = location.pathname.split('/').pop();
+  const VOTED_KEY = `voted_${pollId}`;
+  let chosen = null;
+  let checkTimer = null;
+
+  async function init() {
+    try {
+      const res = await fetch(`/api/poll/${pollId}`);
+      if (!res.ok) { showError(res.status === 404 ? 'Poll not found.' : 'Could not load poll.'); return; }
+      const data = await res.json();
+      hide('s-loading');
+      if (data.is_closed) { showResults(data); return; }
+      if (localStorage.getItem(VOTED_KEY)) { showThanks(); startChecking(); return; }
+      showVote(data);
+      startTimer(data.closes_at);
+    } catch { showError('Unable to connect. Please refresh.'); }
+  }
+
+  function showVote(data) {
+    show('s-vote');
+    document.getElementById('q-text').textContent = data.question;
+    const list = document.getElementById('opts');
+    data.options.forEach((opt, i) => {
+      const lbl = document.createElement('label');
+      lbl.className = 'opt-label';
+      lbl.innerHTML = `<input type="radio" name="opt" value="${i}"> ${opt}`;
+      lbl.querySelector('input').onchange = () => {
+        document.querySelectorAll('.opt-label').forEach(l => l.classList.remove('selected'));
+        lbl.classList.add('selected');
+        chosen = i;
+      };
+      list.appendChild(lbl);
+    });
+    document.getElementById('sub-btn').onclick = submit;
+  }
+
+  function startTimer(closes_at) {
+    const el = document.getElementById('timer');
+    const tick = () => {
+      const left = closes_at - Date.now();
+      if (left <= 0) { el.textContent = 'Poll closing…'; checkIfClosed(); return; }
+      const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
+      el.textContent = `Closes in ${m}:${s.toString().padStart(2, '0')}`;
+      el.className = `timer${left < 60000 ? ' urgent' : ''}`;
+    };
+    tick(); setInterval(tick, 1000);
+  }
+
+  async function submit() {
+    const name = document.getElementById('name').value.trim();
+    const err = document.getElementById('err');
+    err.textContent = '';
+    if (!name) { err.textContent = 'Please enter your name.'; return; }
+    if (chosen === null) { err.textContent = 'Please select an option.'; return; }
+    const btn = document.getElementById('sub-btn');
+    btn.disabled = true; btn.textContent = 'Submitting…';
+    try {
+      const res = await fetch(`/api/poll/${pollId}/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, option_index: chosen, screen_width: screen.width, screen_height: screen.height }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      localStorage.setItem(VOTED_KEY, '1');
+      hide('s-vote'); showThanks(); startChecking();
+    } catch (e) {
+      err.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Submit Answer';
+    }
+  }
+
+  function showThanks() { show('s-thanks'); }
+
+  function startChecking() {
+    checkTimer = setInterval(checkIfClosed, 10000);
+  }
+
+  async function checkIfClosed() {
+    try {
+      const res = await fetch(`/api/poll/${pollId}`);
+      const data = await res.json();
+      if (data.is_closed) { clearInterval(checkTimer); hide('s-thanks'); showResults(data); }
+    } catch {}
+  }
+
+  function showResults(data) {
+    show('s-results');
+    document.getElementById('r-q').textContent = data.question;
+    const max = Math.max(...data.results, 1);
+    data.options.forEach((opt, i) => {
+      const count = data.results[i];
+      const pct = data.total > 0 ? Math.round(count / data.total * 100) : 0;
+      const div = document.createElement('div');
+      div.className = `r-item${count === max && count > 0 ? ' top' : ''}`;
+      div.innerHTML = `<div class="r-row"><span>${opt}</span><span class="cnt">${count} vote${count !== 1 ? 's' : ''} · ${pct}%</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>`;
+      document.getElementById('r-list').appendChild(div);
+    });
+    document.getElementById('r-total').textContent = `${data.total} total response${data.total !== 1 ? 's' : ''}`;
+  }
+
+  function showError(msg) { show('s-error'); document.getElementById('err-text').textContent = msg; }
+  function show(id) { document.getElementById(id).style.display = 'block'; }
+  function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+  init();
+</script>
+</body>
+</html>

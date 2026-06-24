@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClassPoll — Admin</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4ff; min-height: 100vh; padding: 24px 16px; color: #1e293b; }
+    .container { max-width: 760px; margin: 0 auto; }
+    .top-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .top-bar h1 { font-size: 1.5rem; color: #4f46e5; font-weight: 800; }
+    .badge { font-size: 0.75rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
+    .badge.live { background: #dcfce7; color: #16a34a; }
+    .badge.closed { background: #fee2e2; color: #dc2626; }
+    .card { background: white; border-radius: 16px; padding: 28px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); margin-bottom: 18px; }
+
+    /* Stats */
+    .poll-q { font-size: 1.25rem; font-weight: 700; margin-bottom: 20px; line-height: 1.4; }
+    .stats { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+    .stat { flex: 1; min-width: 110px; background: #f8fafc; border-radius: 10px; padding: 14px; text-align: center; }
+    .stat .val { font-size: 1.8rem; font-weight: 800; color: #4f46e5; line-height: 1; }
+    .stat .lbl { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
+    .stat.t .val { font-size: 1.3rem; }
+    .stat.t.urgent .val { color: #ef4444; }
+
+    /* Close / closed */
+    .btn-close { width: 100%; padding: 14px; background: #ef4444; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    .btn-close:hover { background: #dc2626; }
+    .btn-close:disabled { opacity: 0.5; cursor: not-allowed; }
+    .closed-banner { background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 10px; padding: 14px; text-align: center; color: #16a34a; font-weight: 600; }
+
+    /* Share */
+    .share { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+    .share-links { flex: 1; min-width: 180px; }
+    .share-links p { font-size: 0.82rem; color: #64748b; margin-bottom: 10px; }
+    .link-row { display: flex; gap: 8px; align-items: center; background: #f1f5f9; border-radius: 8px; padding: 8px 12px; }
+    .link-row code { flex: 1; font-size: 0.75rem; color: #4f46e5; word-break: break-all; }
+    .btn-copy { background: #4f46e5; color: white; border: none; border-radius: 6px; padding: 5px 10px; font-size: 0.75rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .btn-copy.ok { background: #10b981; }
+
+    /* Results bars */
+    .section-label { font-size: 0.95rem; font-weight: 700; margin-bottom: 14px; }
+    .r-note { font-size: 0.82rem; color: #94a3b8; margin-top: 14px; }
+    .r-item { margin-bottom: 16px; }
+    .r-row { display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: 600; margin-bottom: 5px; }
+    .r-row .cnt { font-weight: 400; color: #64748b; }
+    .bar-track { background: #e2e8f0; border-radius: 6px; height: 13px; overflow: hidden; }
+    .bar-fill { background: #4f46e5; height: 100%; border-radius: 6px; transition: width 0.6s; }
+    .r-item.top .bar-fill { background: #10b981; }
+
+    /* Response table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+    th { text-align: left; padding: 9px 11px; background: #f8fafc; color: #64748b; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1.5px solid #e2e8f0; white-space: nowrap; }
+    td { padding: 9px 11px; border-bottom: 1px solid #f1f5f9; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+
+    .loading { text-align: center; color: #94a3b8; padding: 40px; }
+    .error-box { text-align: center; color: #ef4444; padding: 40px; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <h1>ClassPoll</h1>
+    <span class="badge" id="badge">Loading…</span>
+  </div>
+
+  <div class="card" id="s-loading"><div class="loading">Loading your poll…</div></div>
+  <div class="card" id="s-error" style="display:none"><div class="error-box" id="err-text"></div></div>
+
+  <div id="s-main" style="display:none">
+    <!-- Status card -->
+    <div class="card">
+      <div class="poll-q" id="poll-q"></div>
+      <div class="stats">
+        <div class="stat"><div class="val" id="resp-count">0</div><div class="lbl">Responses</div></div>
+        <div class="stat t" id="timer-stat"><div class="val" id="timer-val">—</div><div class="lbl">Time remaining</div></div>
+      </div>
+      <div id="close-wrap">
+        <button class="btn-close" id="close-btn">Close Poll Now</button>
+      </div>
+      <div class="closed-banner" id="closed-banner" style="display:none">
+        Poll is closed — students can now see the results.
+      </div>
+    </div>
+
+    <!-- Share card -->
+    <div class="card">
+      <div class="section-label">Share with Students</div>
+      <div class="share">
+        <div id="qrcode"></div>
+        <div class="share-links">
+          <p>Scan the QR code or share this link:</p>
+          <div class="link-row">
+            <code id="student-url"></code>
+            <button class="btn-copy" onclick="copyLink('student-url',this)">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results card -->
+    <div class="card">
+      <div class="section-label" id="results-label">Response Count</div>
+      <div id="r-list"></div>
+      <p class="r-note" id="r-note">Full results will appear here once you close the poll.</p>
+    </div>
+
+    <!-- Response table (after close) -->
+    <div class="card" id="table-card" style="display:none">
+      <div class="section-label">All Responses</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th><th>Name</th><th>Answer</th><th>Time</th>
+              <th>OS</th><th>Browser</th><th>Screen</th><th>IP</th>
+            </tr>
+          </thead>
+          <tbody id="r-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const token = location.pathname.split('/').pop();
+  let qrDone = false;
+  let timerTick = null;
+  let refreshLoop = null;
+  let pollData = null;
+
+  async function load() {
+    try {
+      const res = await fetch(`/api/admin/${token}`);
+      if (!res.ok) {
+        hide('s-loading'); show('s-error');
+        document.getElementById('err-text').textContent = 'Admin panel not found. Check your link.';
+        return;
+      }
+      pollData = await res.json();
+      render(pollData);
+    } catch {
+      hide('s-loading'); show('s-error');
+      document.getElementById('err-text').textContent = 'Could not connect. Please refresh.';
+    }
+  }
+
+  function render(d) {
+    hide('s-loading'); show('s-main');
+
+    // Badge
+    const badge = document.getElementById('badge');
+    badge.textContent = d.is_closed ? 'Closed' : 'Live';
+    badge.className = `badge ${d.is_closed ? 'closed' : 'live'}`;
+
+    // Question & count
+    document.getElementById('poll-q').textContent = d.question;
+    document.getElementById('resp-count').textContent = d.total;
+
+    // QR + link (once)
+    if (!qrDone) {
+      const studentUrl = `${location.origin}/p/${d.id}`;
+      document.getElementById('student-url').textContent = studentUrl;
+      new QRCode(document.getElementById('qrcode'), {
+        text: studentUrl, width: 148, height: 148,
+        colorDark: '#1e293b', colorLight: '#ffffff',
+      });
+      qrDone = true;
+    }
+
+    // Timer
+    if (!d.is_closed) {
+      if (!timerTick) { timerTick = setInterval(() => tickTimer(d.closes_at), 1000); tickTimer(d.closes_at); }
+    } else {
+      document.getElementById('timer-val').textContent = 'Ended';
+      clearInterval(timerTick);
+    }
+
+    // Close / closed state
+    if (d.is_closed) {
+      hide('close-wrap');
+      show('closed-banner');
+      clearInterval(refreshLoop);
+    } else {
+      document.getElementById('close-btn').onclick = closePoll;
+    }
+
+    // Results bars
+    renderBars(d);
+
+    // Table
+    if (d.is_closed) {
+      renderTable(d);
+      show('table-card');
+    }
+  }
+
+  function tickTimer(closes_at) {
+    const left = closes_at - Date.now();
+    const stat = document.getElementById('timer-stat');
+    if (left <= 0) {
+      document.getElementById('timer-val').textContent = 'Closing…';
+      clearInterval(timerTick);
+      load();
+      return;
+    }
+    const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
+    document.getElementById('timer-val').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    stat.className = `stat t${left < 60000 ? ' urgent' : ''}`;
+  }
+
+  function renderBars(d) {
+    const list = document.getElementById('r-list');
+    list.innerHTML = '';
+    const max = Math.max(...d.results, 1);
+    const closed = d.is_closed;
+    if (closed) {
+      document.getElementById('results-label').textContent = 'Results';
+      hide('r-note');
+    }
+    d.options.forEach((opt, i) => {
+      const count = d.results[i];
+      const pct = d.total > 0 ? Math.round(count / d.total * 100) : 0;
+      const top = closed && count === max && count > 0;
+      const div = document.createElement('div');
+      div.className = `r-item${top ? ' top' : ''}`;
+      div.innerHTML = `<div class="r-row"><span>${opt}</span>
+        <span class="cnt">${count} vote${count !== 1 ? 's' : ''}${closed ? ` · ${pct}%` : ''}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${closed ? pct : 0}%"></div></div>`;
+      list.appendChild(div);
+    });
+  }
+
+  function renderTable(d) {
+    const tbody = document.getElementById('r-tbody');
+    tbody.innerHTML = '';
+    d.responses.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${r.num}</td><td><strong>${r.name}</strong></td><td>${r.option}</td>
+        <td>${new Date(r.submitted_at).toLocaleTimeString()}</td>
+        <td>${r.os}</td><td>${r.browser}</td><td>${r.screen}</td><td>${r.ip}</td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function closePoll() {
+    if (!confirm('Close the poll now? Students will see results immediately.')) return;
+    const btn = document.getElementById('close-btn');
+    btn.disabled = true; btn.textContent = 'Closing…';
+    try {
+      await fetch(`/api/admin/${token}/close`, { method: 'POST' });
+      await load();
+    } catch {
+      btn.disabled = false; btn.textContent = 'Close Poll Now';
+    }
+  }
+
+  function copyLink(id, btn) {
+    navigator.clipboard.writeText(document.getElementById(id).textContent);
+    btn.textContent = 'Copied!'; btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  }
+
+  function show(id) { document.getElementById(id).style.display = 'block'; }
+  function hide(id) { document.getElementById(id).style.display = 'none'; }
+
+  load();
+  refreshLoop = setInterval(load, 15000);
+</script>
+</body>
+</html>

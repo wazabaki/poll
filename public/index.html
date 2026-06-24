@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClassPoll — Create a Poll</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4ff; min-height: 100vh; padding: 28px 16px; color: #1e293b; }
+    .container { max-width: 580px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 32px; }
+    header h1 { font-size: 2rem; color: #4f46e5; font-weight: 800; letter-spacing: -0.5px; }
+    header p { color: #64748b; margin-top: 4px; }
+    .card { background: white; border-radius: 16px; padding: 32px; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+    h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 24px; }
+    .field { margin-bottom: 20px; }
+    label { display: block; font-size: 0.85rem; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    input[type=text], input[type=password], select {
+      width: 100%; padding: 11px 14px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+      font-size: 1rem; color: #1e293b; outline: none; transition: border-color 0.15s;
+    }
+    input:focus, select:focus { border-color: #4f46e5; }
+    .options-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+    .option-row { display: flex; gap: 8px; align-items: center; }
+    .option-row input { flex: 1; }
+    .btn-remove { background: none; border: none; color: #cbd5e1; cursor: pointer; font-size: 1.4rem; line-height: 1; padding: 2px 6px; }
+    .btn-remove:hover { color: #ef4444; }
+    .btn-add { width: 100%; padding: 9px; background: none; border: 1.5px dashed #c7d2fe; border-radius: 8px; color: #4f46e5; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    .btn-add:hover { background: #eef2ff; }
+    .btn-primary { width: 100%; margin-top: 8px; padding: 13px; background: #4f46e5; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+    .err { color: #ef4444; font-size: 0.85rem; margin-top: 10px; text-align: center; }
+
+    /* Success screen */
+    #success-card { display: none; }
+    .success-title { font-size: 1.2rem; font-weight: 700; color: #10b981; margin-bottom: 20px; }
+    .qr-block { display: flex; flex-direction: column; align-items: center; padding: 24px; background: #f8fafc; border-radius: 12px; margin-bottom: 24px; }
+    .qr-block small { color: #64748b; margin-top: 10px; font-size: 0.8rem; }
+    .link-group { margin-bottom: 14px; }
+    .link-group > label { margin-bottom: 6px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; }
+    .link-row { display: flex; gap: 8px; align-items: center; background: #f1f5f9; border-radius: 8px; padding: 9px 13px; }
+    .link-row code { flex: 1; font-size: 0.78rem; color: #4f46e5; word-break: break-all; }
+    .btn-copy { background: #4f46e5; color: white; border: none; border-radius: 6px; padding: 5px 11px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .btn-copy.ok { background: #10b981; }
+    .warning-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 12px 14px; font-size: 0.83rem; color: #92400e; margin-bottom: 14px; }
+    .btn-admin { display: block; text-align: center; padding: 12px; background: #f0fdf4; color: #16a34a; border: 1.5px solid #86efac; border-radius: 10px; font-weight: 700; text-decoration: none; margin-top: 8px; }
+    .btn-admin:hover { background: #dcfce7; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>ClassPoll</h1>
+    <p>Quick polls for the classroom</p>
+  </header>
+
+  <div class="card" id="create-card">
+    <h2>Create a New Poll</h2>
+    <form id="create-form">
+      <div class="field">
+        <label for="pw">Admin Password</label>
+        <input type="password" id="pw" placeholder="Your admin password" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="question">Poll Question</label>
+        <input type="text" id="question" placeholder="e.g. Which principle did we discuss today?">
+      </div>
+      <div class="field">
+        <label>Answer Options</label>
+        <div class="options-list" id="options-list">
+          <div class="option-row"><input type="text" class="opt" placeholder="Option 1"></div>
+          <div class="option-row"><input type="text" class="opt" placeholder="Option 2"></div>
+        </div>
+        <button type="button" class="btn-add" id="add-opt">+ Add another option</button>
+      </div>
+      <div class="field">
+        <label for="dur">Poll Duration</label>
+        <select id="dur">
+          <option value="3">3 minutes</option>
+          <option value="5" selected>5 minutes</option>
+          <option value="10">10 minutes</option>
+          <option value="15">15 minutes</option>
+          <option value="20">20 minutes</option>
+          <option value="30">30 minutes</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary" id="submit-btn">Create Poll</button>
+      <p class="err" id="err"></p>
+    </form>
+  </div>
+
+  <div class="card" id="success-card">
+    <div class="success-title">✓ Poll Created!</div>
+    <div class="qr-block">
+      <div id="qrcode"></div>
+      <small>Students scan this to vote</small>
+    </div>
+    <div class="link-group">
+      <label>Student Link — share this with your class</label>
+      <div class="link-row">
+        <code id="student-url"></code>
+        <button class="btn-copy" onclick="copyText('student-url', this)">Copy</button>
+      </div>
+    </div>
+    <div class="warning-box">⚠️ Save your Admin Link below. You need it to view results and close the poll. Do not share it with students.</div>
+    <div class="link-group">
+      <label>Your Admin Link — keep this private</label>
+      <div class="link-row">
+        <code id="admin-url"></code>
+        <button class="btn-copy" onclick="copyText('admin-url', this)">Copy</button>
+      </div>
+    </div>
+    <a href="#" id="admin-btn" class="btn-admin">Open Admin Panel →</a>
+  </div>
+</div>
+
+<script>
+  let optCount = 2;
+
+  document.getElementById('add-opt').onclick = () => {
+    if (optCount >= 6) return;
+    optCount++;
+    const row = document.createElement('div');
+    row.className = 'option-row';
+    row.innerHTML = `<input type="text" class="opt" placeholder="Option ${optCount}">
+      <button type="button" class="btn-remove" onclick="this.parentElement.remove(); optCount--;">×</button>`;
+    document.getElementById('options-list').appendChild(row);
+  };
+
+  document.getElementById('create-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const err = document.getElementById('err');
+    err.textContent = '';
+    const opts = [...document.querySelectorAll('.opt')].map(i => i.value.trim()).filter(Boolean);
+    if (opts.length < 2) { err.textContent = 'Please fill in at least 2 options.'; return; }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true; btn.textContent = 'Creating…';
+
+    try {
+      const res = await fetch('/api/poll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password: document.getElementById('pw').value,
+          question: document.getElementById('question').value,
+          options: opts,
+          duration_minutes: Number(document.getElementById('dur').value),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showSuccess(data);
+    } catch (e) {
+      err.textContent = e.message;
+      btn.disabled = false; btn.textContent = 'Create Poll';
+    }
+  };
+
+  function showSuccess({ poll_id, admin_token }) {
+    const base = window.location.origin;
+    const studentUrl = `${base}/p/${poll_id}`;
+    const adminUrl = `${base}/admin/${admin_token}`;
+    document.getElementById('student-url').textContent = studentUrl;
+    document.getElementById('admin-url').textContent = adminUrl;
+    document.getElementById('admin-btn').href = adminUrl;
+    new QRCode(document.getElementById('qrcode'), {
+      text: studentUrl, width: 200, height: 200,
+      colorDark: '#1e293b', colorLight: '#ffffff',
+    });
+    document.getElementById('create-card').style.display = 'none';
+    document.getElementById('success-card').style.display = 'block';
+  }
+
+  function copyText(id, btn) {
+    navigator.clipboard.writeText(document.getElementById(id).textContent);
+    btn.textContent = 'Copied!'; btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('ok'); }, 2000);
+  }
+</script>
+</body>
+</html>
