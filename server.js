@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme';
 
 const db = new Database(process.env.DB_PATH || 'poll.db');
@@ -199,4 +199,4 @@ app.get('/api/dashboard', (req, res) => {
   res.json(polls.map(p => ({ ...p, response_count: countMap[p.id] || 0 })));
 });
 
-app.listen(PORT, () => console.log(`ClassPoll running on port ${PORT}`));
+app.listen(port, () => console.log(`ClassPoll running on port ${port}`));
