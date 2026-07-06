@@ -172,6 +172,32 @@ app.get('/api/admin/:token', (req, res) => {
   });
 });
 
+// Admin — edit a draft poll
+app.put('/api/admin/:token', (req, res) => {
+  const poll = db.prepare('SELECT * FROM polls WHERE admin_token = ?').get(req.params.token);
+  if (!poll) return res.status(404).json({ error: 'Not found' });
+  if (poll.status !== 'draft') return res.status(400).json({ error: 'Only draft polls can be edited' });
+
+  const { question, options, duration_minutes } = req.body;
+  if (!question?.trim()) return res.status(400).json({ error: 'Question is required' });
+  if (!Array.isArray(options) || options.filter(o => o?.trim()).length < 2)
+    return res.status(400).json({ error: 'At least 2 options are required' });
+
+  db.prepare('UPDATE polls SET question = ?, options = ?, duration_minutes = ? WHERE admin_token = ?')
+    .run(question.trim(), JSON.stringify(options.filter(o => o?.trim())), Number(duration_minutes), req.params.token);
+  res.json({ success: true });
+});
+
+// Admin — delete a poll
+app.delete('/api/admin/:token', (req, res) => {
+  const poll = db.prepare('SELECT * FROM polls WHERE admin_token = ?').get(req.params.token);
+  if (!poll) return res.status(404).json({ error: 'Not found' });
+  if (poll.status === 'active') return res.status(400).json({ error: 'Close the poll before deleting it' });
+  db.prepare('DELETE FROM responses WHERE poll_id = ?').run(poll.id);
+  db.prepare('DELETE FROM polls WHERE admin_token = ?').run(req.params.token);
+  res.json({ success: true });
+});
+
 // Admin — start a draft poll
 app.post('/api/admin/:token/start', (req, res) => {
   const poll = db.prepare('SELECT * FROM polls WHERE admin_token = ?').get(req.params.token);

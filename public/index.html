@@ -138,6 +138,33 @@
 
 <script>
   let optCount = 2;
+  const editToken = new URLSearchParams(location.search).get('edit');
+
+  if (editToken) {
+    // Edit mode — load existing draft and pre-fill form
+    document.querySelector('h2').textContent = 'Edit Draft Poll';
+    document.getElementById('submit-btn').textContent = 'Save Changes';
+    document.querySelector('.field:has(#pw)').style.display = 'none'; // hide password field
+    document.querySelector('.field:has([name="start"])').style.display = 'none'; // hide start toggle
+
+    fetch(`/api/admin/${editToken}`)
+      .then(r => r.json())
+      .then(data => {
+        document.getElementById('question').value = data.question;
+        document.getElementById('dur').value = data.duration_minutes;
+        const list = document.getElementById('options-list');
+        list.innerHTML = '';
+        optCount = 0;
+        data.options.forEach((opt, i) => {
+          optCount++;
+          const row = document.createElement('div');
+          row.className = 'option-row';
+          row.innerHTML = `<input type="text" class="opt" placeholder="Option ${optCount}" value="${opt}">` +
+            (i >= 2 ? `<button type="button" class="btn-remove" onclick="this.parentElement.remove(); optCount--;">×</button>` : '');
+          list.appendChild(row);
+        });
+      });
+  }
 
   document.getElementById('add-opt').onclick = () => {
     if (optCount >= 6) return;
@@ -157,26 +184,42 @@
     if (opts.length < 2) { err.textContent = 'Please fill in at least 2 options.'; return; }
 
     const btn = document.getElementById('submit-btn');
-    btn.disabled = true; btn.textContent = 'Creating…';
+    btn.disabled = true; btn.textContent = editToken ? 'Saving…' : 'Creating…';
 
     try {
-      const res = await fetch('/api/poll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          password: document.getElementById('pw').value,
-          question: document.getElementById('question').value,
-          options: opts,
-          duration_minutes: Number(document.getElementById('dur').value),
-          start_now: document.querySelector('input[name="start"]:checked').value === 'now',
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      showSuccess(data);
+      let res, data;
+      if (editToken) {
+        res = await fetch(`/api/admin/${editToken}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: document.getElementById('question').value,
+            options: opts,
+            duration_minutes: Number(document.getElementById('dur').value),
+          }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        window.location.href = `/admin/${editToken}`;
+      } else {
+        res = await fetch('/api/poll', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password: document.getElementById('pw').value,
+            question: document.getElementById('question').value,
+            options: opts,
+            duration_minutes: Number(document.getElementById('dur').value),
+            start_now: document.querySelector('input[name="start"]:checked').value === 'now',
+          }),
+        });
+        data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        showSuccess(data);
+      }
     } catch (e) {
       err.textContent = e.message;
-      btn.disabled = false; btn.textContent = 'Create Poll';
+      btn.disabled = false; btn.textContent = editToken ? 'Save Changes' : 'Create Poll';
     }
   };
 
