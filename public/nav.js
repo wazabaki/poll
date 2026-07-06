@@ -1,4 +1,4 @@
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
   const path = window.location.pathname;
 
   const style = document.createElement('style');
